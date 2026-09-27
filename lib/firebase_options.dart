@@ -30,46 +30,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC2zoMAhQ0Ig_FgUoTo8Fx6U0nogmp5H5I',
-    appId: '1:452582285981:web:45eabcc7cfda93684fea74',
-    messagingSenderId: '452582285981',
-    projectId: 'utilitarian-bee-kv9wh',
-    authDomain: 'utilitarian-bee-kv9wh.firebaseapp.com',
-    storageBucket: 'utilitarian-bee-kv9wh.firebasestorage.app',
+    apiKey: '',
+    appId: '',
+    messagingSenderId: '',
+    projectId: '',
+    authDomain: 'u.com',
+    storageBucket: '',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyC2zoMAhQ0Ig_FgUoTo8Fx6U0nogmp5H5I',
-    appId: '1:452582285981:android:45eabcc7cfda93684fea74',
-    messagingSenderId: '452582285981',
-    projectId: 'utilitarian-bee-kv9wh',
-    storageBucket: 'utilitarian-bee-kv9wh.firebasestorage.app',
+    apiKey: 'I',
+    appId: '',
+    messagingSenderId: '',
+    projectId: 'kv9wh',
+    storageBucket: '.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC2zoMAhQ0Ig_FgUoTo8Fx6U0nogmp5H5I',
-    appId: '1:452582285981:ios:45eabcc7cfda93684fea74',
-    messagingSenderId: '452582285981',
-    projectId: 'utilitarian-bee-kv9wh',
-    storageBucket: 'utilitarian-bee-kv9wh.firebasestorage.app',
-    iosBundleId: 'pk.edu.comsats.portal',
+    apiKey: '',
+    appId: '',
+    messagingSenderId: '',
+    projectId: '',
+    storageBucket: 'u.app',
+    iosBundleId: '',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC2zoMAhQ0Ig_FgUoTo8Fx6U0nogmp5H5I',
-    appId: '1:452582285981:ios:45eabcc7cfda93684fea74',
+    apiKey: '',
+    appId: '',
     messagingSenderId: '452582285981',
-    projectId: 'utilitarian-bee-kv9wh',
-    storageBucket: 'utilitarian-bee-kv9wh.firebasestorage.app',
-    iosBundleId: 'pk.edu.comsats.portal',
+    projectId: '',
+    storageBucket: '.app',
+    iosBundleId: '',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyC2zoMAhQ0Ig_FgUoTo8Fx6U0nogmp5H5I',
-    appId: '1:452582285981:web:45eabcc7cfda93684fea74',
-    messagingSenderId: '452582285981',
-    projectId: 'utilitarian-bee-kv9wh',
-    authDomain: 'utilitarian-bee-kv9wh.firebaseapp.com',
-    storageBucket: 'utilitarian-bee-kv9wh.firebasestorage.app',
+    apiKey: '',
+    appId: '',
+    messagingSenderId: '',
+    projectId: 'u',
+    authDomain: '',
+    storageBucket: 'u.app',
   );
 }
