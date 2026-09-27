@@ -1,0 +1,164 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Registered COMSATS university student profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "description": "Firebase Auth UID" },
+        "name": { "type": "string", "maxLength": 100, "description": "Full name of the student" },
+        "email": { "type": "string", "maxLength": 150, "description": "Official COMSATS email" },
+        "registrationNumber": { "type": "string", "maxLength": 30, "description": "Student registration number e.g. FA22-BCS-042" },
+        "phone": { "type": "string", "maxLength": 25, "description": "Contact phone number" },
+        "program": { "type": "string", "maxLength": 80, "description": "Academic program e.g. BS Computer Science" },
+        "campus": { "type": "string", "maxLength": 50, "description": "Campus name e.g. Islamabad" },
+        "semester": { "type": "number", "description": "Current semester number" },
+        "batch": { "type": "string", "maxLength": 30, "description": "Batch e.g. Fall 2022" },
+        "cgpa": { "type": "number", "description": "Cumulative Grade Point Average" },
+        "completedCreditHours": { "type": "number", "description": "Total completed credit hours" },
+        "academicStanding": { "type": "string", "maxLength": 50, "description": "Academic standing e.g. Good Standing" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["uid", "name", "email", "registrationNumber", "program", "campus", "semester"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "University catalog course offered by COMSATS",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "maxLength": 20, "description": "Course code e.g. CSC241" },
+        "title": { "type": "string", "maxLength": 120, "description": "Course title" },
+        "creditHours": { "type": "number", "description": "Credit hours e.g. 3 or 4" },
+        "department": { "type": "string", "maxLength": 80, "description": "Department name" },
+        "description": { "type": "string", "maxLength": 1000, "description": "Course description" },
+        "prerequisiteCourseIds": { "type": "array", "description": "List of prerequisite course IDs" },
+        "prerequisiteCodes": { "type": "array", "description": "List of prerequisite course codes" },
+        "minimumSemester": { "type": "number", "description": "Minimum semester required to take course" },
+        "isOffered": { "type": "boolean", "description": "Whether course is offered in current semester" },
+        "availableSeats": { "type": "number", "description": "Remaining available seats across all sections" },
+        "totalSeats": { "type": "number", "description": "Total capacity across all sections" }
+      },
+      "required": ["code", "title", "creditHours", "department", "isOffered"]
+    },
+    "Section": {
+      "title": "Section",
+      "description": "Class section belonging to a course",
+      "type": "object",
+      "properties": {
+        "sectionCode": { "type": "string", "maxLength": 10, "description": "Section code e.g. BCS-4A" },
+        "courseId": { "type": "string", "maxLength": 64, "description": "Parent course document ID" },
+        "courseCode": { "type": "string", "maxLength": 20, "description": "Course code e.g. CSC241" },
+        "instructorId": { "type": "string", "maxLength": 64, "description": "Assigned instructor ID" },
+        "instructorName": { "type": "string", "maxLength": 100, "description": "Instructor display name" },
+        "days": { "type": "array", "description": "Days of the week e.g. ['Monday', 'Wednesday']" },
+        "timeSlot": { "type": "string", "maxLength": 50, "description": "Formatted time slot e.g. 08:30 - 10:00" },
+        "startTime": { "type": "string", "maxLength": 20, "description": "Start time string" },
+        "endTime": { "type": "string", "maxLength": 20, "description": "End time string" },
+        "room": { "type": "string", "maxLength": 40, "description": "Classroom or Lab ID" },
+        "capacity": { "type": "number", "description": "Maximum student capacity" },
+        "enrolledCount": { "type": "number", "description": "Currently enrolled students count" },
+        "isFull": { "type": "boolean", "description": "Flag indicating if section is at capacity" }
+      },
+      "required": ["sectionCode", "courseId", "courseCode", "instructorName", "days", "timeSlot", "room", "capacity"]
+    },
+    "Instructor": {
+      "title": "Instructor",
+      "description": "Faculty member at COMSATS",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100, "description": "Instructor full name and title" },
+        "department": { "type": "string", "maxLength": 80, "description": "Academic department" },
+        "email": { "type": "string", "maxLength": 150, "description": "Faculty email address" },
+        "office": { "type": "string", "maxLength": 50, "description": "Office room and block location" },
+        "coursesTaught": { "type": "array", "description": "List of course codes taught" }
+      },
+      "required": ["name", "department", "email"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "Student course and section enrollment document",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "maxLength": 128, "description": "Student Auth UID" },
+        "courseId": { "type": "string", "maxLength": 64, "description": "Registered course document ID" },
+        "sectionId": { "type": "string", "maxLength": 64, "description": "Registered section document ID" },
+        "semester": { "type": "string", "maxLength": 40, "description": "Semester e.g. Spring 2026" },
+        "academicYear": { "type": "string", "maxLength": 20, "description": "Academic year e.g. 2025-2026" },
+        "registeredAt": { "type": "string", "description": "Registration ISO timestamp" },
+        "status": { "type": "string", "maxLength": 30, "description": "Status e.g. Registered or Dropped" },
+        "courseCode": { "type": "string", "maxLength": 20, "description": "Denormalized course code" },
+        "courseTitle": { "type": "string", "maxLength": 120, "description": "Denormalized course title" },
+        "creditHours": { "type": "number", "description": "Denormalized credit hours" },
+        "sectionCode": { "type": "string", "maxLength": 20, "description": "Denormalized section code" },
+        "instructorName": { "type": "string", "maxLength": 100, "description": "Denormalized instructor name" },
+        "days": { "type": "array", "description": "Lecture days" },
+        "timeSlot": { "type": "string", "maxLength": 50, "description": "Lecture time slot" },
+        "room": { "type": "string", "maxLength": 40, "description": "Classroom" }
+      },
+      "required": ["studentId", "courseId", "sectionId", "semester", "status", "courseCode", "creditHours"]
+    },
+    "AcademicRecord": {
+      "title": "AcademicRecord",
+      "description": "Past semester grade summary and course history",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "maxLength": 128, "description": "Student Auth UID" },
+        "semester": { "type": "string", "maxLength": 40, "description": "Semester title e.g. Fall 2025" },
+        "academicYear": { "type": "string", "maxLength": 20, "description": "Academic year e.g. 2024-2025" },
+        "gpa": { "type": "number", "description": "GPA for this semester" },
+        "cgpa": { "type": "number", "description": "Cumulative GPA up to this semester" },
+        "creditHoursEarned": { "type": "number", "description": "Earned credits in this semester" },
+        "creditHoursAttempted": { "type": "number", "description": "Attempted credits in this semester" },
+        "courses": { "type": "array", "description": "List of courses taken with grades" }
+      },
+      "required": ["studentId", "semester", "gpa", "cgpa", "creditHoursEarned"]
+    },
+    "SystemSettings": {
+      "title": "SystemSettings",
+      "description": "Global registration window and portal configurations",
+      "type": "object",
+      "properties": {
+        "isRegistrationOpen": { "type": "boolean", "description": "Registration portal active status" },
+        "semester": { "type": "string", "maxLength": 40, "description": "Current semester name" },
+        "academicYear": { "type": "string", "maxLength": 20, "description": "Current academic year" },
+        "startDate": { "type": "string", "maxLength": 40, "description": "Window start date" },
+        "endDate": { "type": "string", "maxLength": 40, "description": "Window deadline" },
+        "maxCreditHours": { "type": "number", "description": "Maximum allowable credit hours per semester" },
+        "minCreditHours": { "type": "number", "description": "Minimum required credit hours per semester" },
+        "addDropDeadline": { "type": "string", "maxLength": 40, "description": "Add / drop period deadline" }
+      },
+      "required": ["isRegistrationOpen", "semester", "maxCreditHours", "minCreditHours"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Student personal profile document keyed by auth uid"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Available university courses catalogue"
+    },
+    "/courses/{courseId}/sections/{sectionId}": {
+      "schema": "Section",
+      "description": "Subcollection of sections offered for each course"
+    },
+    "/instructors/{instructorId}": {
+      "schema": "Instructor",
+      "description": "COMSATS faculty instructor profiles"
+    },
+    "/registrations/{registrationId}": {
+      "schema": "Registration",
+      "description": "Student course registration records"
+    },
+    "/academic_records/{recordId}": {
+      "schema": "AcademicRecord",
+      "description": "Semester-wise academic transcript records"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "SystemSettings",
+      "description": "Portal wide semester settings such as registration periods"
+    }
+  }
+}

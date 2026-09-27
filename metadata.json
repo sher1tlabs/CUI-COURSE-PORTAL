@@ -1,0 +1,6 @@
+{
+  "name": "COMSATS Student Portal",
+  "description": "Your university. Your courses. Your semester. Complete mobile course registration and academic portal for COMSATS University students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
