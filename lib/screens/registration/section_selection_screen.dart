@@ -4,6 +4,7 @@ import '../../models/section.dart';
 import '../../services/local_data_service.dart';
 import '../../widgets/section_card.dart';
 import '../../widgets/instructor_info_sheet.dart';
+import 'registration_advisor_screen.dart';
 
 class SectionSelectionScreen extends StatefulWidget {
   final Course course;
@@ -77,72 +78,39 @@ class _SectionSelectionScreenState extends State<SectionSelectionScreen> {
       return;
     }
 
-    // Normal Registration Confirmation Dialog
-    final currentCredits = _dataService.totalRegisteredCreditHours;
-    final newTotalCredits = currentCredits + widget.course.creditHours;
+    // Route through Registration Advisor for pre-registration analysis
+    final registeredCourses = _dataService.registrations
+        .map((r) => _dataService.getCourseByCode(r.courseCode))
+        .whereType<Course>()
+        .toList();
+    final candidateCourses = [...registeredCourses, widget.course];
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF141414) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Register for ${widget.course.code}?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.course.title,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-            ),
-            const SizedBox(height: 6),
-            Text('${section.sectionName} • ${widget.course.creditHours} Credit Hours'),
-            Text('Instructor: ${section.instructor}'),
-            Text('${section.days.join(" / ")} • ${section.startTime} - ${section.endTime}'),
-            Text('Room: ${section.room}'),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Current total:'),
-                Text('$currentCredits credit hours', style: const TextStyle(fontWeight: FontWeight.w600)),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('New total:'),
-                Text('$newTotalCredits credit hours', style: const TextStyle(fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ],
+    final candidateSections = <String, Section>{};
+    for (final r in _dataService.registrations) {
+      final s = _dataService.getSectionById(r.sectionId);
+      if (s != null) candidateSections[r.courseCode] = s;
+    }
+    candidateSections[widget.course.code] = section;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RegistrationAdvisorScreen(
+          targetCourses: candidateCourses,
+          targetSections: candidateSections,
+          onConfirmRegistration: () => _executeRegistration(section),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              final success = _dataService.registerCourse(widget.course.code, section.id);
-              if (success) {
-                _showSuccessDialog();
-              } else {
-                final validation = _dataService.validateRegistration(widget.course, section);
-                _showErrorDialog(validation['error'] ?? 'Registration failed.');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDark ? Colors.white : Colors.black,
-              foregroundColor: isDark ? Colors.black : Colors.white,
-            ),
-            child: const Text('Confirm Registration'),
-          ),
-        ],
       ),
     );
+  }
+
+  void _executeRegistration(Section section) {
+    final success = _dataService.registerCourse(widget.course.code, section.id);
+    if (success) {
+      _showSuccessDialog();
+    } else {
+      final validation = _dataService.validateRegistration(widget.course, section);
+      _showErrorDialog(validation['error'] ?? 'Registration failed.');
+    }
   }
 
   void _showSuccessDialog() {

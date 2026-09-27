@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/local_data_service.dart';
 import '../../services/auth_service.dart';
 import '../auth/welcome_screen.dart';
+import '../announcements/announcements_screen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 
@@ -195,6 +196,19 @@ class ProfileScreen extends StatelessWidget {
                           onChanged: (_) => onToggleTheme!(),
                         ),
                       ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.campaign_outlined, size: 20),
+                      title: const Text('COMSATS Announcements', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Official university circulars & deadlines', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.tune, size: 20),

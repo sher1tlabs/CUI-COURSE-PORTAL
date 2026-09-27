@@ -129,6 +129,78 @@
         "addDropDeadline": { "type": "string", "maxLength": 40, "description": "Add / drop period deadline" }
       },
       "required": ["isRegistrationOpen", "semester", "maxCreditHours", "minCreditHours"]
+    },
+    "CourseReview": {
+      "title": "CourseReview",
+      "description": "Anonymous student course and instructor feedback",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "maxLength": 128, "description": "Internal UID of reviewer" },
+        "courseCode": { "type": "string", "maxLength": 20, "description": "Target course code" },
+        "courseName": { "type": "string", "maxLength": 120, "description": "Course title" },
+        "instructorId": { "type": "string", "maxLength": 64, "description": "Target instructor ID" },
+        "instructorName": { "type": "string", "maxLength": 100, "description": "Target instructor name" },
+        "semesterId": { "type": "string", "maxLength": 40, "description": "Semester taken" },
+        "difficulty": { "type": "number", "description": "Difficulty rating from 1 to 5" },
+        "workload": { "type": "number", "description": "Workload rating from 1 to 5" },
+        "teachingRating": { "type": "number", "description": "Teaching clarity rating 1 to 5" },
+        "organizationRating": { "type": "number", "description": "Course organization 1 to 5" },
+        "communicationRating": { "type": "number", "description": "Communication rating 1 to 5" },
+        "supportRating": { "type": "number", "description": "Availability support 1 to 5" },
+        "comment": { "type": "string", "maxLength": 1500, "description": "Optional anonymous comment" },
+        "anonymous": { "type": "boolean", "description": "Always true for student anonymity" },
+        "status": { "type": "string", "maxLength": 30, "description": "Review status: published, pending, flagged, hidden" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      },
+      "required": ["studentId", "courseCode", "difficulty", "workload", "teachingRating", "status"]
+    },
+    "ReviewReport": {
+      "title": "ReviewReport",
+      "description": "Student reports on inappropriate feedback for moderation",
+      "type": "object",
+      "properties": {
+        "reviewId": { "type": "string", "maxLength": 128, "description": "Target review document ID" },
+        "reportedBy": { "type": "string", "maxLength": 128, "description": "Reporter UID" },
+        "reason": { "type": "string", "maxLength": 500, "description": "Reason for report" },
+        "createdAt": { "type": "string", "description": "Report timestamp" },
+        "status": { "type": "string", "maxLength": 30, "description": "Report status e.g. pending, resolved" }
+      },
+      "required": ["reviewId", "reportedBy", "reason", "status"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Official university notice and circular",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Announcement title" },
+        "body": { "type": "string", "maxLength": 5000, "description": "Announcement detailed content" },
+        "category": { "type": "string", "maxLength": 50, "description": "Category: Registration, Examination, Academic, etc." },
+        "priority": { "type": "string", "maxLength": 20, "description": "Priority: Normal, Important, Urgent" },
+        "publishedAt": { "type": "string", "description": "Publication timestamp" },
+        "expiresAt": { "type": "string", "description": "Expiry timestamp" },
+        "campus": { "type": "string", "maxLength": 50, "description": "Target campus or All" },
+        "department": { "type": "string", "maxLength": 80, "description": "Target department or All" },
+        "program": { "type": "string", "maxLength": 80, "description": "Target program or All" },
+        "semester": { "type": "string", "maxLength": 20, "description": "Target semester or All" },
+        "createdBy": { "type": "string", "maxLength": 100, "description": "Issuing university authority" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Update timestamp" }
+      },
+      "required": ["title", "body", "category", "priority", "publishedAt"]
+    },
+    "DegreePlan": {
+      "title": "DegreePlan",
+      "description": "Configured university degree study plan and course roadmap",
+      "type": "object",
+      "properties": {
+        "program": { "type": "string", "maxLength": 100, "description": "Degree program name" },
+        "campus": { "type": "string", "maxLength": 50, "description": "Campus name or All" },
+        "totalCreditHours": { "type": "number", "description": "Required credit hours for graduation" },
+        "semesters": { "type": "array", "description": "List of semester course plans" },
+        "electives": { "type": "array", "description": "List of available elective codes" }
+      },
+      "required": ["program", "totalCreditHours", "semesters"]
     }
   },
   "firestore": {
@@ -159,6 +231,26 @@
     "/system_settings/{settingId}": {
       "schema": "SystemSettings",
       "description": "Portal wide semester settings such as registration periods"
+    },
+    "/course_reviews/{reviewId}": {
+      "schema": "CourseReview",
+      "description": "Student course and instructor evaluations"
+    },
+    "/review_reports/{reportId}": {
+      "schema": "ReviewReport",
+      "description": "Reports submitted against inappropriate course reviews"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "University official announcements and news circulars"
+    },
+    "/degree_plans/{planId}": {
+      "schema": "DegreePlan",
+      "description": "Degree roadmaps and curriculum distribution"
+    },
+    "/admins/{adminId}": {
+      "schema": "Student",
+      "description": "Administrative authority profiles"
     }
   }
 }

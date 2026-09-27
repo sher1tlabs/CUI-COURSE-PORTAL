@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../services/local_data_service.dart';
+import '../../services/announcement_service.dart';
+import '../../models/announcement.dart';
 import '../../widgets/credit_progress_card.dart';
 import '../../widgets/registration_status_card.dart';
 import '../../widgets/timetable_card.dart';
 import '../registration/course_registration_screen.dart';
 import '../registration/registered_courses_screen.dart';
+import '../registration/registration_advisor_screen.dart';
+import '../announcements/announcements_screen.dart';
+import '../announcements/announcement_details_screen.dart';
 import '../timetable/timetable_screen.dart';
 import '../academic/academic_record_screen.dart';
 import '../profile/profile_screen.dart';
@@ -220,6 +225,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         onTap: () => setState(() => _currentIndex = 1),
                       ),
                       _buildQuickAction(
+                        icon: Icons.fact_check_outlined,
+                        label: 'Registration Advisor',
+                        isDark: isDark,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const RegistrationAdvisorScreen()),
+                          );
+                        },
+                      ),
+                      _buildQuickAction(
+                        icon: Icons.campaign_outlined,
+                        label: 'Announcements',
+                        isDark: isDark,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
+                          );
+                        },
+                      ),
+                      _buildQuickAction(
                         icon: Icons.library_books_outlined,
                         label: 'My Courses',
                         isDark: isDark,
@@ -229,21 +254,163 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         },
                       ),
-                      _buildQuickAction(
-                        icon: Icons.calendar_month_outlined,
-                        label: 'Timetable',
-                        isDark: isDark,
-                        onTap: () => setState(() => _currentIndex = 2),
-                      ),
-                      _buildQuickAction(
-                        icon: Icons.school_outlined,
-                        label: 'Academic Record',
-                        isDark: isDark,
-                        onTap: () => setState(() => _currentIndex = 3),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 28),
+
+                  // Latest Announcements Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Latest Announcements',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'Official',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? const Color(0xFFD4D4D4) : const Color(0xFF374151),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: isDark ? Colors.white : Colors.black,
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  StreamBuilder<List<UniversityAnnouncement>>(
+                    stream: AnnouncementService.instance.streamLatestAnnouncements(limit: 3, student: student),
+                    builder: (context, snapshot) {
+                      final items = snapshot.data ?? [];
+                      if (items.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF141414) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5),
+                            ),
+                          ),
+                          child: Text(
+                            'No new announcements at this time.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? const Color(0xFF9E9E9E) : const Color(0xFF6B7280),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: items.map((ann) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF141414) : Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: ann.isUrgent
+                                    ? (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFCA5A5))
+                                    : (isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
+                              ),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AnnouncementDetailsScreen(announcement: ann),
+                                  ),
+                                );
+                              },
+                              title: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      ann.category,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? const Color(0xFFD4D4D4) : const Color(0xFF374151),
+                                      ),
+                                    ),
+                                  ),
+                                  if (ann.isUrgent) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'URGENT',
+                                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFDC2626)),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  ann.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : Colors.black,
+                                  ),
+                                ),
+                              ),
+                              trailing: Icon(
+                                Icons.chevron_right,
+                                size: 18,
+                                color: isDark ? const Color(0xFF737373) : const Color(0xFF9CA3AF),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
 
                   // Today's Timetable Section
                   Row(

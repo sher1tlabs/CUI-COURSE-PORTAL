@@ -20,10 +20,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'adnanshersb@gmail.com'
+      );
+    }
+
     // Students Collection
     match /students/{studentId} {
-      allow get: if isOwner(studentId);
-      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow get: if isOwner(studentId) || isAdmin();
+      allow list: if (isSignedIn() && resource.data.uid == request.auth.uid) || isAdmin();
       allow create: if isOwner(studentId) &&
         request.resource.data.uid == studentId &&
         request.resource.data.name is string && request.resource.data.name.size() <= 100 &&
@@ -32,55 +39,100 @@ service cloud.firestore {
       allow update: if isOwner(studentId) &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.email == resource.data.email;
-      allow delete: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Courses Collection
     match /courses/{courseId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
-      allow delete: if false;
+      allow create, update: if isSignedIn(); // Allows seat count adjustment during course registration
+      allow delete: if isAdmin();
 
       // Subcollection: Sections
       match /sections/{sectionId} {
         allow read: if isSignedIn();
         allow create, update: if isSignedIn();
-        allow delete: if false;
+        allow delete: if isAdmin();
       }
     }
 
     // Instructors Collection
     match /instructors/{instructorId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Registrations Collection
     match /registrations/{registrationId} {
-      allow get: if isSignedIn() && resource.data.studentId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.studentId == request.auth.uid;
+      allow get: if (isSignedIn() && resource.data.studentId == request.auth.uid) || isAdmin();
+      allow list: if (isSignedIn() && resource.data.studentId == request.auth.uid) || isAdmin();
       allow create: if isSignedIn() &&
         request.resource.data.studentId == request.auth.uid &&
         request.resource.data.courseId is string && request.resource.data.courseId.size() <= 64 &&
         request.resource.data.sectionId is string && request.resource.data.sectionId.size() <= 64;
-      allow update: if isSignedIn() &&
+      allow update: if (isSignedIn() &&
         resource.data.studentId == request.auth.uid &&
-        request.resource.data.studentId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.studentId == request.auth.uid;
+        request.resource.data.studentId == request.auth.uid) || isAdmin();
+      allow delete: if (isSignedIn() && resource.data.studentId == request.auth.uid) || isAdmin();
     }
 
     // Academic Records Collection
     match /academic_records/{recordId} {
-      allow get: if isSignedIn() && resource.data.studentId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.studentId == request.auth.uid;
-      allow create, update: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
-      allow delete: if false;
+      allow get: if (isSignedIn() && resource.data.studentId == request.auth.uid) || isAdmin();
+      allow list: if (isSignedIn() && resource.data.studentId == request.auth.uid) || isAdmin();
+      allow create, update: if (isSignedIn() && request.resource.data.studentId == request.auth.uid) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     // System Settings Collection
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
+    }
+
+    // Course Reviews Collection
+    match /course_reviews/{reviewId} {
+      // Students can read published reviews
+      allow get, list: if isSignedIn() && (resource.data.status == 'published' || resource.data.studentId == request.auth.uid || isAdmin());
+      // Students can create their own review
+      allow create: if isSignedIn() &&
+        request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.courseCode is string && request.resource.data.courseCode.size() <= 20 &&
+        request.resource.data.difficulty >= 1 && request.resource.data.difficulty <= 5 &&
+        request.resource.data.workload >= 1 && request.resource.data.workload <= 5 &&
+        request.resource.data.teachingRating >= 1 && request.resource.data.teachingRating <= 5;
+      // Review owner can update or report
+      allow update: if (isSignedIn() && (
+        (resource.data.studentId == request.auth.uid && request.resource.data.studentId == request.auth.uid) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+        isAdmin()
+      ));
+      allow delete: if (isSignedIn() && resource.data.studentId == request.auth.uid) || isAdmin();
+    }
+
+    // Review Reports Collection (Moderation)
+    match /review_reports/{reportId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.reportedBy == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // University Announcements Collection
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isSignedIn(); // Seed utility & admin
+    }
+
+    // Degree Plans Collection
+    match /degree_plans/{planId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isSignedIn(); // Seed utility & admin
     }
   }
 }

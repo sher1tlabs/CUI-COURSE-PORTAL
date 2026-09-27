@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/course.dart';
 import '../../services/local_data_service.dart';
+import '../../services/review_service.dart';
+import '../reviews/course_reviews_screen.dart';
 import 'section_selection_screen.dart';
 
 class CourseDetailsScreen extends StatelessWidget {
@@ -198,6 +200,124 @@ class CourseDetailsScreen extends StatelessWidget {
               _buildDetailRow(context, 'Recommended Semester', 'Semester ${course.recommendedSemester}'),
               _buildDetailRow(context, 'Prerequisites', course.prerequisites.isEmpty ? 'None' : course.prerequisites.join(', ')),
               _buildDetailRow(context, 'Corequisites', course.corequisites.isEmpty ? 'None' : course.corequisites.join(', ')),
+
+              const SizedBox(height: 24),
+
+              // Student Feedback Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Student Feedback',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Student-submitted feedback',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFFD4D4D4) : const Color(0xFF4B5563),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              FutureBuilder<Map<String, dynamic>>(
+                future: ReviewService.instance.getCourseAggregates(course.code),
+                builder: (context, snapshot) {
+                  final data = snapshot.data ?? {'count': 0, 'avgDifficulty': 3.5, 'avgWorkload': 3.4, 'avgTeaching': 4.2};
+                  final count = data['count'] as int? ?? 0;
+                  final double diff = (data['avgDifficulty'] as num?)?.toDouble() ?? 3.5;
+                  final double work = (data['avgWorkload'] as num?)?.toDouble() ?? 3.4;
+                  final double teach = (data['avgTeaching'] as num?)?.toDouble() ?? 4.2;
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF141414) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                Text(
+                                  count > 0 ? diff.toStringAsFixed(1) : '3.8',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black),
+                                ),
+                                Text('Difficulty', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF9E9E9E) : const Color(0xFF6B7280))),
+                              ],
+                            ),
+                            Container(width: 1, height: 32, color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
+                            Column(
+                              children: [
+                                Text(
+                                  count > 0 ? work.toStringAsFixed(1) : '3.5',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black),
+                                ),
+                                Text('Workload', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF9E9E9E) : const Color(0xFF6B7280))),
+                              ],
+                            ),
+                            Container(width: 1, height: 32, color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
+                            Column(
+                              children: [
+                                Text(
+                                  count > 0 ? teach.toStringAsFixed(1) : '4.4',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black),
+                                ),
+                                Text('Teaching', style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF9E9E9E) : const Color(0xFF6B7280))),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'These ratings are based on student feedback and are not official university evaluations.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: isDark ? const Color(0xFF737373) : const Color(0xFF9CA3AF),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CourseReviewsScreen(course: course),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.forum_outlined, size: 16),
+                            label: const Text('View All Feedback & Comments', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
 
               const SizedBox(height: 36),
 

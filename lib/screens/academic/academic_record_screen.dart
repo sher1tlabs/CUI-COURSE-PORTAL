@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/local_data_service.dart';
+import '../registration/registration_advisor_screen.dart';
 import 'semester_details_screen.dart';
 
 class AcademicRecordScreen extends StatelessWidget {
@@ -211,6 +212,45 @@ class AcademicRecordScreen extends StatelessWidget {
                       ],
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Registration Advisor Quick Check
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF141414) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB),
+                  ),
+                ),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF262626) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.fact_check_outlined, size: 20),
+                  ),
+                  title: const Text(
+                    'Registration Advisor Check',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'Evaluate credits, degree plan & prerequisites',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const RegistrationAdvisorScreen(),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 28),

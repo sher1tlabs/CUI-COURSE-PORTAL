@@ -613,6 +613,181 @@ class FirestoreService {
           await _coursesRef.doc(course.id).collection('sections').doc(sec.id).set(sec.toMap());
         }
       }
+
+      // 4. Seed University Announcements
+      final announcementsRef = _firestore.collection('announcements');
+      final announcements = [
+        {
+          'id': 'ann-1',
+          'title': 'Spring 2026 Course Registration & Add/Drop Deadline',
+          'body': 'Course registration for the Spring 2026 semester is now actively open through the portal. Students are advised to register before February 28, 2026, 11:59 PM. Late fee charges will apply thereafter.',
+          'category': 'Registration',
+          'priority': 'Urgent',
+          'publishedAt': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+          'expiresAt': DateTime.now().add(const Duration(days: 30)).toIso8601String(),
+          'campus': 'All',
+          'department': 'All',
+          'program': 'All',
+          'semester': 'All',
+          'createdBy': 'Registrar Office CUI',
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'ann-2',
+          'title': 'Mid-Term Examination Datesheet Notification',
+          'body': 'The tentative schedule for Spring 2026 mid-term examinations has been published. Individual datesheets by section will be visible under the Timetable and Academic tabs next week.',
+          'category': 'Examination',
+          'priority': 'Important',
+          'publishedAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
+          'expiresAt': DateTime.now().add(const Duration(days: 45)).toIso8601String(),
+          'campus': 'Islamabad',
+          'department': 'Computer Science',
+          'program': 'BS Computer Science',
+          'semester': 'All',
+          'createdBy': 'Controller of Examinations',
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'ann-3',
+          'title': 'HEC & COMSATS Need-Based Scholarships 2026',
+          'body': 'Applications are invited from eligible students for the HEC Need-Based and COMSATS Endowment Fund scholarships. Submit attested supporting documentation to the Student Financial Aid Office (SFAO) by March 15, 2026.',
+          'category': 'Scholarship',
+          'priority': 'Normal',
+          'publishedAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+          'expiresAt': DateTime.now().add(const Duration(days: 20)).toIso8601String(),
+          'campus': 'All',
+          'department': 'All',
+          'program': 'All',
+          'semester': 'All',
+          'createdBy': 'Student Financial Aid Office',
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+        {
+          'id': 'ann-4',
+          'title': 'Guest Lecture: Modern Distributed Systems in Cloud Infrastructure',
+          'body': 'The Department of Computer Science is hosting Dr. Farhan Zaidi (Cloud Systems Architect) for a seminar on Kubernetes and fault-tolerant microservices. Venue: CS Block Seminar Hall 1.',
+          'category': 'Events',
+          'priority': 'Normal',
+          'publishedAt': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+          'expiresAt': DateTime.now().add(const Duration(days: 10)).toIso8601String(),
+          'campus': 'Islamabad',
+          'department': 'Computer Science',
+          'program': 'All',
+          'semester': 'All',
+          'createdBy': 'CS Department Society',
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+      ];
+
+      for (final ann in announcements) {
+        await announcementsRef.doc(ann['id'] as String).set(ann);
+      }
+
+      // 5. Seed Degree Plans
+      final degreePlansRef = _firestore.collection('degree_plans');
+      await degreePlansRef.doc('bs-cs').set({
+        'program': 'BS Computer Science',
+        'campus': 'All',
+        'totalCreditHours': 133,
+        'semesters': [
+          {
+            'semester': 1,
+            'courses': ['CSC101', 'MTH101', 'HUM100', 'PHY120', 'ISL101'],
+          },
+          {
+            'semester': 2,
+            'courses': ['CSC103', 'MTH105', 'PHY121', 'HUM103', 'CSC112'],
+          },
+          {
+            'semester': 3,
+            'courses': ['CSC211', 'MTH231', 'EEE241', 'HUM102', 'CSC291'],
+          },
+          {
+            'semester': 4,
+            'courses': ['CSC241', 'CPE241', 'CSC339', 'MTH262'],
+            'electives': ['CSC483'],
+          },
+          {
+            'semester': 5,
+            'courses': ['CSC322', 'CSC312', 'MTH375'],
+            'electives': ['CSC483', 'CSC471'],
+          },
+        ],
+        'electives': ['CSC483', 'CSC471', 'CSC412', 'SWE302'],
+      });
+
+      // 6. Seed Student Feedback (Course Reviews)
+      final reviewsRef = _firestore.collection('course_reviews');
+      final reviews = [
+        {
+          'id': 'rev-241-1',
+          'studentId': 'verified_student_1',
+          'courseCode': 'CSC241',
+          'courseName': 'Object Oriented Programming',
+          'instructorId': 'inst-1',
+          'instructorName': 'Dr. Tariq Mahmood',
+          'semesterId': 'Fall 2025',
+          'difficulty': 4,
+          'workload': 4,
+          'teachingRating': 5,
+          'organizationRating': 5,
+          'communicationRating': 4,
+          'supportRating': 5,
+          'comment': 'Lectures were very thorough. Make sure to complete all coding lab assignments independently as exams heavily emphasize OOP design patterns and pointers.',
+          'anonymous': true,
+          'status': 'published',
+          'createdAt': DateTime.now().subtract(const Duration(days: 12)).toIso8601String(),
+          'updatedAt': DateTime.now().subtract(const Duration(days: 12)).toIso8601String(),
+        },
+        {
+          'id': 'rev-241-2',
+          'studentId': 'verified_student_2',
+          'courseCode': 'CSC241',
+          'courseName': 'Object Oriented Programming',
+          'instructorId': 'inst-1',
+          'instructorName': 'Dr. Tariq Mahmood',
+          'semesterId': 'Spring 2025',
+          'difficulty': 4,
+          'workload': 3,
+          'teachingRating': 4,
+          'organizationRating': 4,
+          'communicationRating': 5,
+          'supportRating': 4,
+          'comment': 'Good balance of theory and practice. The semester project requires steady weekly milestones.',
+          'anonymous': true,
+          'status': 'published',
+          'createdAt': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+          'updatedAt': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+        },
+        {
+          'id': 'rev-cpe-1',
+          'studentId': 'verified_student_3',
+          'courseCode': 'CPE241',
+          'courseName': 'Database Systems',
+          'instructorId': 'inst-2',
+          'instructorName': 'Dr. Ayesha Siddiqa',
+          'semesterId': 'Fall 2025',
+          'difficulty': 3,
+          'workload': 4,
+          'teachingRating': 5,
+          'organizationRating': 5,
+          'communicationRating': 5,
+          'supportRating': 4,
+          'comment': 'Excellent explanation of normalization and relational algebra. Lab tasks with PostgreSQL helped reinforce complex queries.',
+          'anonymous': true,
+          'status': 'published',
+          'createdAt': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+          'updatedAt': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+        },
+      ];
+
+      for (final rev in reviews) {
+        await reviewsRef.doc(rev['id'] as String).set(rev);
+      }
     } catch (e) {
       print('Seed initialization error: $e');
     }
