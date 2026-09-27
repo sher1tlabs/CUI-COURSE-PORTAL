@@ -126,7 +126,7 @@ class ReviewService {
     };
   }
 
-  /// Submit a review (enforces authenticated UID, anonymous display flag, published status)
+  /// Submit a review (enforces authenticated UID, anonymous display flag, published status, and one-review-per-course constraint using Firestore transactions)
   Future<void> submitReview({
     required String courseCode,
     required String courseName,
@@ -144,34 +144,46 @@ class ReviewService {
     final user = _auth.currentUser;
     if (user == null) throw 'User not authenticated.';
 
-    final eligibility = await checkReviewEligibility(studentId: user.uid, courseCode: courseCode);
+    final eligibility = await checkReviewEligibility(studentId: user.uid, courseCode: courseCode, semesterId: semesterId);
     if (eligibility['eligible'] != true) {
       throw eligibility['reason'] ?? 'You are not eligible to submit feedback for this course.';
     }
 
-    final newDoc = _reviewsRef.doc();
-    final review = CourseReview(
-      id: newDoc.id,
-      studentId: user.uid,
-      courseCode: courseCode,
-      courseName: courseName,
-      instructorId: instructorId,
-      instructorName: instructorName,
-      semesterId: semesterId,
-      difficulty: difficulty,
-      workload: workload,
-      teachingRating: teachingRating,
-      organizationRating: organizationRating,
-      communicationRating: communicationRating,
-      supportRating: supportRating,
-      comment: comment.trim(),
-      anonymous: true,
-      status: 'published',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+    // Deterministic document ID to enforce one-review-per-student-per-course-per-semester
+    final cleanSemester = semesterId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_').toLowerCase();
+    final cleanCode = courseCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_').toLowerCase();
+    final reviewDocId = '${user.uid}_${cleanCode}_$cleanSemester';
+    final docRef = _reviewsRef.doc(reviewDocId);
 
-    await newDoc.set(review.toMap());
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      if (snapshot.exists) {
+        throw 'You have already submitted feedback for $courseCode in $semesterId.';
+      }
+
+      final review = CourseReview(
+        id: reviewDocId,
+        studentId: user.uid,
+        courseCode: courseCode,
+        courseName: courseName,
+        instructorId: instructorId,
+        instructorName: instructorName,
+        semesterId: semesterId,
+        difficulty: difficulty,
+        workload: workload,
+        teachingRating: teachingRating,
+        organizationRating: organizationRating,
+        communicationRating: communicationRating,
+        supportRating: supportRating,
+        comment: comment.trim(),
+        anonymous: true,
+        status: 'published',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      transaction.set(docRef, review.toMap());
+    });
   }
 
   /// Report a review for moderation

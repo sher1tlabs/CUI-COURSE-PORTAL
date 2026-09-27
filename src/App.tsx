@@ -17,16 +17,17 @@ import {
   LogOut,
   Settings,
   Edit3,
-  Code2,
   ExternalLink,
   Shield,
-  Smartphone,
   Info,
   Check,
   X,
-  FileCode2,
   Download,
   Copy,
+  Star,
+  MessageSquare,
+  Flag,
+  ThumbsUp,
 } from 'lucide-react';
 import {
   initialStudent,
@@ -37,8 +38,9 @@ import {
   mockNotifications,
   mockSemesterHistory,
   completedCourseCodes,
+  mockCourseReviews,
 } from './mockData';
-import { Course, Instructor, Section } from './types';
+import { Course, CourseReview, Instructor, Section } from './types';
 import { db, auth } from './firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
@@ -59,8 +61,25 @@ export default function App() {
   // App navigation state
   const [authState, setAuthState] = useState<'welcome' | 'login' | 'forgot' | 'authenticated'>('authenticated');
   const [activeTab, setActiveTab] = useState<'home' | 'courses' | 'timetable' | 'academic' | 'profile'>('home');
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [deviceFrame, setDeviceFrame] = useState(true);
+  const isDarkMode = true;
+
+  // Reviews state
+  const [reviews, setReviews] = useState<CourseReview[]>(mockCourseReviews);
+  const [selectedCourseForReviews, setSelectedCourseForReviews] = useState<Course | null>(null);
+  const [selectedCourseForAddReview, setSelectedCourseForAddReview] = useState<Course | null>(null);
+  const [reportReviewModal, setReportReviewModal] = useState<{ reviewId: string; courseCode: string } | null>(null);
+  const [reportReason, setReportReason] = useState('');
+
+  // Submit Review Form State
+  const [reviewDifficulty, setReviewDifficulty] = useState(3);
+  const [reviewWorkload, setReviewWorkload] = useState(3);
+  const [reviewTeaching, setReviewTeaching] = useState(4);
+  const [reviewOrganization, setReviewOrganization] = useState(4);
+  const [reviewCommunication, setReviewCommunication] = useState(4);
+  const [reviewSupport, setReviewSupport] = useState(4);
+  const [reviewComment, setReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewErrorMessage, setReviewErrorMessage] = useState<string | null>(null);
 
   // Sub-screens & modals
   const [selectedCourseForDetails, setSelectedCourseForDetails] = useState<Course | null>(null);
@@ -72,7 +91,6 @@ export default function App() {
   const [showRegistrationSummaryModal, setShowRegistrationSummaryModal] = useState(false);
   const [selectedInstructorModal, setSelectedInstructorModal] = useState<Instructor | null>(null);
   const [selectedSemesterModal, setSelectedSemesterModal] = useState<typeof mockSemesterHistory[0] | null>(null);
-  const [showFlutterSourceModal, setShowFlutterSourceModal] = useState(false);
 
   // Registration rule engine state
   const [student, setStudent] = useState(initialStudent);
@@ -363,86 +381,174 @@ export default function App() {
   // Unread notifications count
   const unreadNotifCount = notifications.filter((n) => !n.isRead).length;
 
+  // Review helper calculations & labels
+  const getCourseReviews = (code: string) => {
+    return reviews.filter((r) => r.courseCode === code && r.status === 'published');
+  };
+
+  const getCourseAggregates = (code: string) => {
+    const courseRevs = getCourseReviews(code);
+    if (courseRevs.length === 0) {
+      return { count: 0, avgDifficulty: 0, avgWorkload: 0, avgTeaching: 0 };
+    }
+    const sumDiff = courseRevs.reduce((acc, r) => acc + r.difficulty, 0);
+    const sumWork = courseRevs.reduce((acc, r) => acc + r.workload, 0);
+    const sumTeach = courseRevs.reduce((acc, r) => acc + r.teachingRating, 0);
+    return {
+      count: courseRevs.length,
+      avgDifficulty: +(sumDiff / courseRevs.length).toFixed(1),
+      avgWorkload: +(sumWork / courseRevs.length).toFixed(1),
+      avgTeaching: +(sumTeach / courseRevs.length).toFixed(1),
+    };
+  };
+
+  const getDifficultyLabel = (val: number) => {
+    const rounded = Math.round(val);
+    switch (rounded) {
+      case 1: return 'Very Easy';
+      case 2: return 'Easy';
+      case 3: return 'Moderate';
+      case 4: return 'Difficult';
+      case 5: return 'Very Difficult';
+      default: return 'Moderate';
+    }
+  };
+
+  const getWorkloadLabel = (val: number) => {
+    const rounded = Math.round(val);
+    switch (rounded) {
+      case 1: return 'Very Low';
+      case 2: return 'Low';
+      case 3: return 'Moderate';
+      case 4: return 'High';
+      case 5: return 'Very High';
+      default: return 'Moderate';
+    }
+  };
+
+  const handleOpenAddReview = (course: Course) => {
+    // Check if student already submitted a review
+    const existing = reviews.find(
+      (r) => r.studentId === student.id && r.courseCode === course.code
+    );
+    if (existing) {
+      setErrorDialog(`You have already submitted an anonymous review for ${course.code}. Each student may submit one review per course.`);
+      return;
+    }
+
+    setReviewDifficulty(3);
+    setReviewWorkload(3);
+    setReviewTeaching(4);
+    setReviewOrganization(4);
+    setReviewCommunication(4);
+    setReviewSupport(4);
+    setReviewComment('');
+    setReviewErrorMessage(null);
+    setSelectedCourseForAddReview(course);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!selectedCourseForAddReview) return;
+
+    // Verify one-review-per-student-per-course constraint
+    const existing = reviews.find(
+      (r) => r.studentId === student.id && r.courseCode === selectedCourseForAddReview.code
+    );
+    if (existing) {
+      setReviewErrorMessage(`You have already reviewed ${selectedCourseForAddReview.code}.`);
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    setReviewErrorMessage(null);
+
+    try {
+      // Find assigned instructor if enrolled
+      const reg = registrations.find((r) => r.courseCode === selectedCourseForAddReview.code);
+      const regSec = reg ? sections.find((s) => s.id === reg.sectionId) : null;
+      const instructorName = regSec ? regSec.instructor : 'Faculty Member';
+      const instructorId = regSec ? regSec.instructorId : 'inst_gen';
+
+      const reviewId = `rev_${student.id}_${selectedCourseForAddReview.code}_spring2026`.toLowerCase();
+      const newReview: CourseReview = {
+        id: reviewId,
+        studentId: student.id,
+        courseCode: selectedCourseForAddReview.code,
+        courseName: selectedCourseForAddReview.title,
+        instructorId,
+        instructorName,
+        semesterId: 'Spring 2026',
+        difficulty: reviewDifficulty,
+        workload: reviewWorkload,
+        teachingRating: reviewTeaching,
+        organizationRating: reviewOrganization,
+        communicationRating: reviewCommunication,
+        supportRating: reviewSupport,
+        comment: reviewComment.trim(),
+        anonymous: true,
+        status: 'published',
+        createdAt: new Date().toISOString(),
+      };
+
+      // Sync to Firestore
+      try {
+        await setDoc(doc(db, 'course_reviews', reviewId), newReview);
+      } catch (err) {
+        console.warn('Syncing to local state (offline/mock fallback):', err);
+      }
+
+      // Update state
+      setReviews((prev) => [newReview, ...prev]);
+      setIsSubmittingReview(false);
+      setSelectedCourseForAddReview(null);
+      triggerToast('Feedback submitted anonymously. Thank you!');
+    } catch (e) {
+      setIsSubmittingReview(false);
+      setReviewErrorMessage(e instanceof Error ? e.message : 'Failed to submit review. Please try again.');
+    }
+  };
+
+  const handleReportReview = async () => {
+    if (!reportReviewModal || !reportReason.trim()) return;
+
+    try {
+      const reportId = `rep_${Date.now()}`;
+      try {
+        await setDoc(doc(db, 'review_reports', reportId), {
+          id: reportId,
+          reviewId: reportReviewModal.reviewId,
+          courseCode: reportReviewModal.courseCode,
+          reportedBy: student.id,
+          reason: reportReason.trim(),
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Report logged locally:', err);
+      }
+
+      setReportReviewModal(null);
+      setReportReason('');
+      triggerToast('Feedback reported for moderation.');
+    } catch {
+      triggerToast('Unable to report feedback at this time.');
+    }
+  };
+
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-[#0a0a0a] text-neutral-100' : 'bg-neutral-100 text-neutral-900'} flex flex-col font-sans transition-colors duration-200`}>
-      {/* Top Banner & Control Bar */}
-      <header className={`border-b ${isDarkMode ? 'bg-[#111111] border-neutral-800' : 'bg-white border-neutral-200'} px-4 py-2.5 flex items-center justify-between text-xs sticky top-0 z-50`}>
-        <div className="flex items-center gap-2">
-          <div className={`w-6 h-6 rounded-md flex items-center justify-center font-black text-xs ${isDarkMode ? 'bg-white text-black' : 'bg-black text-white'}`}>
-            CUI
-          </div>
-          <div>
-            <span className="font-bold tracking-tight text-sm">COMSATS Student Portal</span>
-            <span className="hidden sm:inline-block ml-2 px-1.5 py-0.5 rounded bg-neutral-500/20 text-[10px] font-mono">
-              Flutter / Dart Material 3
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFlutterSourceModal(true)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border font-medium transition ${
-              isDarkMode
-                ? 'border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
-                : 'border-neutral-300 bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
-            }`}
-            title="Inspect Flutter / Dart project files and APK build instructions"
-          >
-            <Code2 size={13} />
-            <span className="hidden sm:inline">Flutter Source Code & APK</span>
-            <span className="sm:hidden">Dart</span>
-          </button>
-
-          <button
-            onClick={() => setDeviceFrame(!deviceFrame)}
-            className={`hidden md:flex items-center gap-1 px-2 py-1 rounded-md border font-medium ${
-              isDarkMode ? 'border-neutral-700 hover:bg-neutral-800' : 'border-neutral-300 hover:bg-neutral-200'
-            }`}
-          >
-            <Smartphone size={13} />
-            <span>{deviceFrame ? 'Frame: ON' : 'Full Width'}</span>
-          </button>
-
-          <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`p-1.5 rounded-md border ${
-              isDarkMode ? 'border-neutral-700 hover:bg-neutral-800' : 'border-neutral-300 hover:bg-neutral-200'
-            }`}
-            title="Toggle Monochrome Dark / Light"
-          >
-            {isDarkMode ? '☀️ Light' : '🌙 Dark'}
-          </button>
-        </div>
-      </header>
-
       {/* Main Container */}
       <main className="flex-1 flex items-center justify-center p-0 md:p-6 overflow-x-hidden">
         <div
-          className={`w-full ${
-            deviceFrame
-              ? 'max-w-[420px] md:rounded-[36px] md:border md:shadow-2xl overflow-hidden'
-              : 'max-w-2xl md:rounded-2xl md:border'
-          } ${
+          className={`w-full max-w-2xl md:rounded-3xl md:border ${
             isDarkMode
               ? 'bg-[#0f0f0f] border-neutral-800 shadow-black/80'
               : 'bg-white border-neutral-200 shadow-neutral-300'
-          } min-h-[780px] flex flex-col relative`}
+          } min-h-[780px] flex flex-col relative overflow-hidden`}
         >
-          {/* Native Phone Status Bar Simulation (Android Style) */}
-          <div className={`px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-medium tracking-tight ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
-            <span>09:41</span>
-            <div className="flex items-center gap-1.5">
-              <span>5G</span>
-              <div className="w-4 h-2 rounded-sm border border-current flex items-center p-0.5">
-                <div className="w-2.5 h-full bg-current rounded-2xs" />
-              </div>
-            </div>
-          </div>
-
           {/* Toast Notification */}
           {successToast && (
-            <div className="absolute top-12 left-4 right-4 z-50 bg-neutral-900 text-white border border-neutral-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-xs animate-in fade-in slide-in-from-top duration-200">
+            <div className="absolute top-4 left-4 right-4 z-50 bg-neutral-900 text-white border border-neutral-700 px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-xs animate-in fade-in slide-in-from-top duration-200">
               <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
               <span className="flex-1 font-medium">{successToast}</span>
               <button onClick={() => setSuccessToast(null)}>
@@ -939,12 +1045,26 @@ export default function App() {
 
                             {/* Action Buttons */}
                             <div className="flex items-center justify-between pt-3 mt-3 border-t border-neutral-800/60 text-xs">
-                              <button
-                                onClick={() => setSelectedCourseForDetails(course)}
-                                className="font-semibold underline text-neutral-400 hover:text-white"
-                              >
-                                View Details
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => setSelectedCourseForDetails(course)}
+                                  className="font-semibold underline text-neutral-400 hover:text-white"
+                                >
+                                  Details
+                                </button>
+                                <button
+                                  onClick={() => setSelectedCourseForReviews(course)}
+                                  className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border border-neutral-800 bg-neutral-900/60 text-amber-400 hover:border-amber-500/50"
+                                  title="View anonymous student ratings & feedback"
+                                >
+                                  <Star size={11} className="fill-amber-400 text-amber-400" />
+                                  <span>
+                                    {getCourseAggregates(course.code).count > 0
+                                      ? `${getCourseAggregates(course.code).avgTeaching} (${getCourseAggregates(course.code).count})`
+                                      : 'Reviews'}
+                                  </span>
+                                </button>
+                              </div>
 
                               <button
                                 onClick={() => {
@@ -1222,16 +1342,6 @@ export default function App() {
                           {isRegistrationOpen ? 'OPEN' : 'CLOSED'}
                         </button>
                       </div>
-
-                      <div className="flex items-center justify-between">
-                        <span>Dark Theme</span>
-                        <button
-                          onClick={() => setIsDarkMode(!isDarkMode)}
-                          className="px-2.5 py-1 rounded-md text-[11px] font-bold border border-neutral-700"
-                        >
-                          {isDarkMode ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
                     </div>
 
                     <button
@@ -1492,7 +1602,21 @@ export default function App() {
                   <div className="flex justify-between"><span>Corequisites</span><span className="font-semibold text-neutral-200">None</span></div>
                 </div>
 
-                <div className="pt-2">
+                <div className="space-y-2 pt-2">
+                  <button
+                    onClick={() => {
+                      const course = selectedCourseForDetails;
+                      setSelectedCourseForDetails(null);
+                      setSelectedCourseForReviews(course);
+                    }}
+                    className={`w-full py-2.5 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 ${
+                      isDarkMode ? 'border-neutral-700 bg-neutral-900 text-amber-400 hover:bg-neutral-800' : 'border-neutral-300 bg-neutral-100 text-neutral-800 hover:bg-neutral-200'
+                    }`}
+                  >
+                    <Star size={14} className="fill-amber-400 text-amber-400" />
+                    <span>View Student Reviews & Feedback ({getCourseReviews(selectedCourseForDetails.code).length})</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       const course = selectedCourseForDetails;
@@ -2050,117 +2174,399 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* ========================================================= */}
+          {/* MODAL: COURSE REVIEWS SCREEN */}
+          {/* ========================================================= */}
+          {selectedCourseForReviews && (
+            <div className="absolute inset-0 z-40 bg-black/80 flex flex-col justify-end animate-in fade-in duration-150">
+              <div className={`w-full max-h-[92%] rounded-t-3xl border-t p-5 overflow-y-auto space-y-4 flex flex-col ${
+                isDarkMode ? 'bg-[#141414] border-neutral-800' : 'bg-white border-neutral-200'
+              }`}>
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-800/40">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
+                        Student Feedback
+                      </span>
+                      <span className="text-xs text-neutral-400">• {selectedCourseForReviews.creditHours} CH</span>
+                    </div>
+                    <h3 className="text-base font-bold mt-1">
+                      {selectedCourseForReviews.code} - {selectedCourseForReviews.title}
+                    </h3>
+                  </div>
+                  <button onClick={() => setSelectedCourseForReviews(null)} className="p-1 text-neutral-400 hover:text-white">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Disclaimer banner */}
+                <div className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs ${
+                  isDarkMode ? 'bg-neutral-900/60 border-neutral-800 text-neutral-400' : 'bg-neutral-50 border-neutral-200 text-neutral-600'
+                }`}>
+                  <Info size={16} className="shrink-0 text-neutral-400 mt-0.5" />
+                  <p className="leading-relaxed text-[11px]">
+                    These ratings are based on student feedback and are not official university evaluations. All student identities are kept strictly confidential.
+                  </p>
+                </div>
+
+                {/* Aggregated Overview */}
+                {(() => {
+                  const aggs = getCourseAggregates(selectedCourseForReviews.code);
+                  const courseRevs = getCourseReviews(selectedCourseForReviews.code);
+
+                  return (
+                    <div className="space-y-4 flex-1 overflow-y-auto">
+                      {aggs.count > 0 && (
+                        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-neutral-50 border-neutral-200'} space-y-3`}>
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span>Rating Summary</span>
+                            <span className="text-neutral-400 font-medium text-[11px]">{aggs.count} {aggs.count === 1 ? 'Review' : 'Reviews'}</span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                            <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-[#121212] border-neutral-800' : 'bg-white border-neutral-200'}`}>
+                              <div className="text-base font-black">{aggs.avgDifficulty}</div>
+                              <div className="text-[10px] text-neutral-400 font-medium">Difficulty</div>
+                              <div className="text-[9px] text-neutral-500 font-mono">{getDifficultyLabel(aggs.avgDifficulty)}</div>
+                            </div>
+
+                            <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-[#121212] border-neutral-800' : 'bg-white border-neutral-200'}`}>
+                              <div className="text-base font-black">{aggs.avgWorkload}</div>
+                              <div className="text-[10px] text-neutral-400 font-medium">Workload</div>
+                              <div className="text-[9px] text-neutral-500 font-mono">{getWorkloadLabel(aggs.avgWorkload)}</div>
+                            </div>
+
+                            <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-[#121212] border-neutral-800' : 'bg-white border-neutral-200'}`}>
+                              <div className="text-base font-black text-amber-400">{aggs.avgTeaching}</div>
+                              <div className="text-[10px] text-neutral-400 font-medium">Teaching</div>
+                              <div className="text-[9px] text-neutral-500 font-mono">Clarity</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add Review Action button */}
+                      <button
+                        onClick={() => {
+                          const course = selectedCourseForReviews;
+                          setSelectedCourseForReviews(null);
+                          handleOpenAddReview(course);
+                        }}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-2 ${
+                          isDarkMode ? 'border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-neutral-100' : 'border-neutral-300 bg-neutral-100 hover:bg-neutral-200 text-neutral-900'
+                        }`}
+                      >
+                        <MessageSquare size={14} />
+                        <span>Write Anonymous Feedback</span>
+                      </button>
+
+                      {/* Reviews List */}
+                      <div className="space-y-3 pt-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                          Student Submissions ({courseRevs.length})
+                        </h4>
+
+                        {courseRevs.length === 0 ? (
+                          <div className={`p-8 rounded-2xl border text-center space-y-2 ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-neutral-50 border-neutral-200'}`}>
+                            <MessageSquare size={28} className="mx-auto text-neutral-500" />
+                            <div className="text-xs font-bold">No Reviews Yet</div>
+                            <p className="text-[11px] text-neutral-400 max-w-xs mx-auto">
+                              Be the first student to share anonymous feedback on course workload and teaching quality.
+                            </p>
+                          </div>
+                        ) : (
+                          courseRevs.map((rev) => (
+                            <div
+                              key={rev.id}
+                              className={`p-4 rounded-2xl border ${
+                                isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-neutral-50 border-neutral-200'
+                              } space-y-2.5`}
+                            >
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5 text-neutral-400">
+                                  <Shield size={13} className="text-neutral-500" />
+                                  <span className="font-semibold text-neutral-300 text-[11px]">Anonymous Student</span>
+                                  <span className="text-[10px]">• {rev.semesterId}</span>
+                                </div>
+                                <button
+                                  onClick={() => setReportReviewModal({ reviewId: rev.id, courseCode: rev.courseCode })}
+                                  className="text-neutral-500 hover:text-red-400 p-1"
+                                  title="Report review"
+                                >
+                                  <Flag size={12} />
+                                </button>
+                              </div>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-800 text-neutral-300">
+                                  Difficulty: {rev.difficulty}/5 ({getDifficultyLabel(rev.difficulty)})
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-neutral-800 text-neutral-300">
+                                  Workload: {rev.workload}/5 ({getWorkloadLabel(rev.workload)})
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400">
+                                  Teaching: {rev.teachingRating}/5
+                                </span>
+                              </div>
+
+                              {rev.comment && (
+                                <p className="text-xs leading-relaxed text-neutral-300 pt-1">
+                                  {rev.comment}
+                                </p>
+                              )}
+
+                              {rev.instructorName && (
+                                <div className="text-[10px] text-neutral-500 pt-1 border-t border-neutral-800/40">
+                                  Instructor: <span className="font-medium text-neutral-400">{rev.instructorName}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* MODAL: SUBMIT REVIEW SCREEN */}
+          {/* ========================================================= */}
+          {selectedCourseForAddReview && (
+            <div className="absolute inset-0 z-50 bg-black/80 flex flex-col justify-end animate-in fade-in duration-150">
+              <div className={`w-full max-h-[92%] rounded-t-3xl border-t p-5 overflow-y-auto space-y-4 flex flex-col ${
+                isDarkMode ? 'bg-[#141414] border-neutral-800' : 'bg-white border-neutral-200'
+              }`}>
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-800/40">
+                  <div>
+                    <h3 className="text-base font-bold">Submit Anonymous Review</h3>
+                    <p className="text-xs text-neutral-400">
+                      {selectedCourseForAddReview.code} • {selectedCourseForAddReview.title}
+                    </p>
+                  </div>
+                  <button onClick={() => setSelectedCourseForAddReview(null)} className="p-1 text-neutral-400 hover:text-white">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Confidentiality Notice */}
+                <div className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs ${
+                  isDarkMode ? 'bg-neutral-900/60 border-neutral-800 text-neutral-300' : 'bg-neutral-50 border-neutral-200 text-neutral-700'
+                }`}>
+                  <Shield size={18} className="shrink-0 text-emerald-400" />
+                  <p className="text-[11px] leading-relaxed">
+                    Your feedback is strictly anonymous. Your name, email, and registration number will never be shown to peers or faculty.
+                  </p>
+                </div>
+
+                {reviewErrorMessage && (
+                  <div className="p-3 rounded-xl border border-red-500/40 bg-red-950/20 text-red-400 text-xs flex items-center gap-2">
+                    <AlertTriangle size={14} className="shrink-0" />
+                    <span>{reviewErrorMessage}</span>
+                  </div>
+                )}
+
+                <div className="space-y-4 flex-1 overflow-y-auto text-xs pr-1">
+                  {/* Rating 1: Difficulty */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between font-semibold">
+                      <span>Course Difficulty</span>
+                      <span className="text-neutral-400 font-normal">{reviewDifficulty} - {getDifficultyLabel(reviewDifficulty)}</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setReviewDifficulty(num)}
+                          className={`py-2 rounded-xl border text-xs font-bold transition ${
+                            reviewDifficulty === num
+                              ? isDarkMode ? 'bg-white text-black border-white' : 'bg-black text-white border-black'
+                              : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rating 2: Workload */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between font-semibold">
+                      <span>Weekly Workload</span>
+                      <span className="text-neutral-400 font-normal">{reviewWorkload} - {getWorkloadLabel(reviewWorkload)}</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setReviewWorkload(num)}
+                          className={`py-2 rounded-xl border text-xs font-bold transition ${
+                            reviewWorkload === num
+                              ? isDarkMode ? 'bg-white text-black border-white' : 'bg-black text-white border-black'
+                              : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rating 3: Teaching Clarity */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between font-semibold">
+                      <span>Teaching Clarity & Instruction</span>
+                      <span className="text-amber-400 font-normal">{reviewTeaching} / 5 Stars</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setReviewTeaching(num)}
+                          className={`py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 transition ${
+                            reviewTeaching === num
+                              ? isDarkMode ? 'bg-amber-400 text-black border-amber-400' : 'bg-amber-500 text-white border-amber-500'
+                              : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          <Star size={12} className={reviewTeaching === num ? 'fill-current' : ''} />
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rating 4: Organization */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between font-semibold">
+                      <span>Course Organization</span>
+                      <span className="text-neutral-400 font-normal">{reviewOrganization} / 5</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setReviewOrganization(num)}
+                          className={`py-2 rounded-xl border text-xs font-bold transition ${
+                            reviewOrganization === num
+                              ? isDarkMode ? 'bg-white text-black border-white' : 'bg-black text-white border-black'
+                              : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rating 5: Communication & Availability */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between font-semibold">
+                      <span>Communication & Instructor Support</span>
+                      <span className="text-neutral-400 font-normal">{reviewCommunication} / 5</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[1, 2, 3, 4, 5].map((num) => (
+                        <button
+                          key={num}
+                          onClick={() => setReviewCommunication(num)}
+                          className={`py-2 rounded-xl border text-xs font-bold transition ${
+                            reviewCommunication === num
+                              ? isDarkMode ? 'bg-white text-black border-white' : 'bg-black text-white border-black'
+                              : isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-400' : 'bg-neutral-100 border-neutral-300 text-neutral-700'
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Comments */}
+                  <div className="space-y-1.5">
+                    <label className="block font-semibold">
+                      Anonymous Comments (Optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      placeholder="Share tips on pacing, assignments, lab work, or exams..."
+                      className={`w-full p-3 rounded-xl border text-xs outline-none ${
+                        isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white placeholder:text-neutral-600' : 'bg-neutral-50 border-neutral-300 text-black placeholder:text-neutral-400'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={isSubmittingReview}
+                    className={`w-full py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 ${
+                      isDarkMode ? 'bg-white text-black hover:bg-neutral-200' : 'bg-black text-white hover:bg-neutral-800'
+                    }`}
+                  >
+                    {isSubmittingReview ? 'Submitting...' : 'Submit Anonymous Feedback'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* MODAL: REPORT REVIEW */}
+          {/* ========================================================= */}
+          {reportReviewModal && (
+            <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-6 animate-in fade-in duration-100">
+              <div className={`w-full max-w-sm rounded-2xl border p-5 space-y-3 ${
+                isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-white border-neutral-200'
+              }`}>
+                <div className="flex justify-between items-start">
+                  <h3 className="text-base font-bold text-red-400">Report Inappropriate Feedback</h3>
+                  <button onClick={() => setReportReviewModal(null)}>
+                    <X size={16} className="text-neutral-400" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Please specify the reason (abusive language, false claims, harassment) for student feedback moderation:
+                </p>
+
+                <textarea
+                  rows={3}
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  placeholder="Describe the issue..."
+                  className={`w-full p-2.5 rounded-xl border text-xs outline-none ${
+                    isDarkMode ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-neutral-50 border-neutral-300 text-black'
+                  }`}
+                />
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setReportReviewModal(null)}
+                    className="flex-1 py-2 rounded-xl border border-neutral-700 text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReportReview}
+                    disabled={!reportReason.trim()}
+                    className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold disabled:opacity-50"
+                  >
+                    Submit Report
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
-
-      {/* ========================================================= */}
-      {/* FLUTTER SOURCE CODE & APK EXPORT DRAWER */}
-      {/* ========================================================= */}
-      {showFlutterSourceModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className={`w-full max-w-3xl max-h-[90vh] rounded-3xl border flex flex-col overflow-hidden ${
-            isDarkMode ? 'bg-[#121212] border-neutral-800 text-neutral-100' : 'bg-white border-neutral-200 text-neutral-900'
-          }`}>
-            <div className="px-6 py-4 border-b border-neutral-800/60 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileCode2 size={20} />
-                <div>
-                  <h3 className="font-bold text-sm">COMSATS Flutter & Dart Source Codebase</h3>
-                  <p className="text-xs text-neutral-400">All Dart models, widgets, screens, and services are created in /lib</p>
-                </div>
-              </div>
-              <button onClick={() => setShowFlutterSourceModal(false)} className="p-1 text-neutral-400 hover:text-white">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs font-mono">
-              <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-[#181818] border-neutral-800' : 'bg-neutral-50 border-neutral-200'}`}>
-                <div className="text-xs font-bold font-sans text-neutral-300 mb-2">How to run & build as Native Android APK:</div>
-                <div className="space-y-1 text-neutral-400 font-mono text-[11px]">
-                  <p># 1. Clone repository or copy /lib, pubspec.yaml, and /android</p>
-                  <p className="text-white bg-neutral-900 px-2 py-1 rounded">flutter pub get</p>
-                  <p># 2. Run directly in connected Android Device or Emulator:</p>
-                  <p className="text-white bg-neutral-900 px-2 py-1 rounded">flutter run</p>
-                  <p># 3. Build Production APK:</p>
-                  <p className="text-white bg-neutral-900 px-2 py-1 rounded">flutter build apk --release</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-sans font-bold text-xs uppercase tracking-wider text-neutral-400 mb-2">Flutter & Firebase Architecture:</h4>
-                <pre className="p-4 rounded-xl bg-black text-neutral-300 overflow-x-auto text-[11px] leading-relaxed">
-{`lib/
-├── main.dart                          [Firebase.initializeApp & SystemChrome overlay]
-├── app.dart                           [MaterialApp & Theme switching]
-├── firebase_options.dart              [FlutterFire config for Android, Web & iOS]
-├── theme/
-│   └── app_theme.dart                 [Monochrome minimal premium Material 3]
-├── models/
-│   ├── student.dart                   [Student profile model with fromMap/toMap]
-│   ├── course.dart                    [Course catalog model with fromMap/toMap]
-│   ├── section.dart                   [Section, instructor, seat model with fromMap/toMap]
-│   ├── instructor.dart                [Instructor profile model with fromMap/toMap]
-│   ├── registration.dart              [Course registration model with fromMap/toMap]
-│   ├── academic_record.dart           [Semester GPA, CGPA & grade history]
-│   ├── system_settings.dart           [Registration deadlines & credit limits]
-│   └── timetable_entry.dart           [Timetable slot model]
-├── services/
-│   ├── auth_service.dart              [Firebase Authentication, signIn, register, reset]
-│   ├── firestore_service.dart         [Cloud Firestore CRUD, courses, transactions, seed]
-│   └── local_data_service.dart        [Rule Engine with Firestore real-time synchronization]
-├── widgets/
-│   ├── course_card.dart               [Course card with prereq indicators]
-│   ├── section_card.dart              [Section card with seat info & conflict badge]
-│   ├── timetable_card.dart            [Timetable time-slot card]
-│   ├── credit_progress_card.dart      [Interactive credit hours progress bar]
-│   ├── registration_status_card.dart  [Open/closed status card with deadline]
-│   └── custom_button.dart             [Monochrome button component]
-├── screens/
-│   ├── auth/
-│   │   ├── welcome_screen.dart        [CUI logo, login & demo student bypass]
-│   │   ├── login_screen.dart          [Firebase Auth email/password login]
-│   │   ├── register_screen.dart       [New student signup & Firestore profile creation]
-│   │   └── forgot_password_screen.dart[Firebase sendPasswordResetEmail flow]
-│   ├── home/
-│   │   └── home_screen.dart           [Live Firestore dashboard & 5-tab NavigationBar]
-│   ├── registration/
-│   │   ├── course_registration_screen.dart [Course catalog, search, filters]
-│   │   ├── course_details_screen.dart      [Syllabus, prereqs, description]
-│   │   ├── section_selection_screen.dart   [Section picker, conflict validator]
-│   │   └── registered_courses_screen.dart  [Drop course, change section]
-│   ├── timetable/
-│   │   └── timetable_screen.dart      [Day view & week view class schedules]
-│   ├── academic/
-│   │   ├── academic_record_screen.dart[CGPA, completed CH, standing]
-│   │   └── semester_details_screen.dart[Semester course breakdown & grades]
-│   └── profile/
-│       ├── profile_screen.dart        [Live student info, settings, Firebase signOut]
-│       ├── edit_profile_screen.dart   [Update phone & name]
-│       └── settings_screen.dart       [Preferences, support, legal]
-pubspec.yaml                           [Flutter 3, firebase_core, firebase_auth, cloud_firestore]
-firestore.rules                        [ABAC hardened Zero-Trust Firestore security rules]
-firebase-blueprint.json                [Intermediate data models & collections blueprint]
-android/
-├── app/google-services.json           [Official Firebase Android credentials]
-├── app/build.gradle                   [Gradle android config, namespace pk.edu.comsats.portal]
-└── app/src/main/AndroidManifest.xml   [Android app manifest]`}</pre>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-neutral-800/60 flex justify-end">
-              <button
-                onClick={() => setShowFlutterSourceModal(false)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold ${
-                  isDarkMode ? 'bg-white text-black' : 'bg-black text-white'
-                }`}
-              >
-                Close Inspector
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

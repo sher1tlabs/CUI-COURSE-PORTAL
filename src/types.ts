@@ -93,3 +93,32 @@ export interface SemesterHistoryItem {
     grade: string;
   }>;
 }
+
+export interface CourseReview {
+  id: string;
+  studentId: string;
+  courseCode: string;
+  courseName: string;
+  instructorId: string;
+  instructorName: string;
+  semesterId: string;
+  difficulty: number; // 1-5
+  workload: number; // 1-5
+  teachingRating: number; // 1-5
+  organizationRating?: number; // 1-5
+  communicationRating?: number; // 1-5
+  supportRating?: number; // 1-5
+  comment: string;
+  anonymous: boolean;
+  status: 'published' | 'pending' | 'flagged' | 'hidden';
+  createdAt: string;
+}
+
+export interface ReviewReport {
+  id: string;
+  reviewId: string;
+  reportedBy: string;
+  reason: string;
+  createdAt: string;
+  status: 'pending' | 'reviewed' | 'dismissed';
+}
